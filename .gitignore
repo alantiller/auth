@@ -3,3 +3,4 @@
 /phpstan.neon
 /phpunit.xml
 .DS_Store
+composer.lock
