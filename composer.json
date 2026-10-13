@@ -1,0 +1,36 @@
+{
+    "name": "alantiller/auth",
+    "description": "The simple, secure and easy to use authentication library",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Alantiller\\Auth\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Alan Tiller",
+            "email": "alan@alantiller.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": ">=8.1",
+        "php-64bit": ">=8.1",
+        "ext-pdo": "*",
+        "ext-sodium": "*"
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse --no-progress",
+        "check": [
+            "@analyse",
+            "@test"
+        ]
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^10.5"
+    }
+}
