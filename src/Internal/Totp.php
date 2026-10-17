@@ -7,10 +7,10 @@ use Alantiller\Auth\Exceptions\ValidationException;
 /**
  * Generate and validate RFC 6238 authenticator codes.
  *
- * Uses SHA-1, six digits and 30-second time periods. Client is responsible for
+ * Uses SHA-1, six digits and 30-second time periods. Auth is responsible for
  * persisting the accepted counter to prevent reuse across requests.
  *
- * @internal Applications should access authentication through Client.
+ * @internal Applications should access authentication through Auth.
  */
 final class Totp
 {

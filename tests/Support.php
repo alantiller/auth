@@ -2,12 +2,12 @@
 
 namespace Alantiller\Auth\Tests;
 
-use Alantiller\Auth\Client;
+use Alantiller\Auth;
 use PHPUnit\Framework\Assert;
 use Throwable;
 
 /** Authentication client using a predictable clock for expiry and replay tests. */
-final class TestClient extends Client
+final class TestAuth extends Auth
 {
     /** @var int The current test time in Unix seconds. */
     public int $clock = 1700000010;

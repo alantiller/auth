@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Alantiller\Auth;
+namespace Alantiller;
 
 use Alantiller\Auth\Exceptions\ConfigurationException;
 use Alantiller\Auth\Exceptions\DatabaseException;
@@ -19,12 +19,12 @@ use Throwable;
 /**
  * Manage users, authentication, two-factor enrollment and user preferences.
  *
- * Client is the application entry point. Every authentication call receives all
+ * Auth is the application entry point. Every authentication call receives all
  * required credentials, and no current user or pending login is kept in memory.
  * The application owns schema creation, authorization, token delivery and HTTP
  * handling; persistent account and token data are stored through PDO.
  */
-class Client
+class Auth
 {
     /**
      * The PDO instance used for database interactions.
@@ -1312,7 +1312,7 @@ class Client
     private function transaction(callable $callback): mixed
     {
         if ($this->pdo->inTransaction()) {
-            throw new TransactionException('Use a PDO connection without an active transaction; Client manages its own transactions.', context: ['operation' => 'begin']);
+            throw new TransactionException('Use a PDO connection without an active transaction; Auth manages its own transactions.', context: ['operation' => 'begin']);
         }
         try {
             if (!$this->pdo->beginTransaction()) {

@@ -4,7 +4,7 @@ A small PHP authentication library built around a PDO connection. Manage account
 
 **Your application owns the database schema and token delivery.** The library never creates tables, runs migrations, sends email or SMS, builds HTTP responses, or sets cookies. It returns tokens so you can distribute them using your own services.
 
-**`Client` is the single entry point.** Each authentication call takes all required credentials together. The client keeps no current user, pending login, or PHP session state, so you can create a fresh instance for every request. Accounts, enrollment data, token records and TOTP replay protection are stored in your database. Classes under `src/Internal` are implementation details; applications only need to use `Alantiller\Auth\Client` and catch its exceptions.
+**`Auth` is the single entry point.** Each authentication call takes all required credentials together. The client keeps no current user, pending login, or PHP session state, so you can create a fresh instance for every request. Accounts, enrollment data, token records and TOTP replay protection are stored in your database. Classes under `src/Internal` are implementation details; applications only need to use `Alantiller\Auth` and catch its exceptions.
 
 ```php
 $result = $auth->authenticate($email, $password, $totpCode);
@@ -28,6 +28,7 @@ $result = $auth->authenticate($email, $password, $totpCode);
 - [Errors](#errors)
 - [Application responsibilities](#application-responsibilities)
 - [Development](#development)
+- [Development notes](#development-notes)
 
 ## Installation and setup
 
@@ -49,7 +50,7 @@ Create the tables through your application's migrations before constructing the 
 <?php
 require __DIR__ . '/vendor/autoload.php';
 
-use Alantiller\Auth\Client;
+use Alantiller\Auth;
 
 $pdo = new PDO(
     'mysql:host=localhost;dbname=my_app;charset=utf8mb4',
@@ -61,12 +62,14 @@ $pdo = new PDO(
     ]
 );
 
-$auth = new Client($pdo, [
+$auth = new Auth($pdo, [
     'issuer' => 'My App',
     // Optional until you use two-factor authentication:
     'encryption_key' => getenv('AUTH_ENCRYPTION_KEY') ?: null,
 ]);
 ```
+
+When updating from `Alantiller\Auth\Client`, change the import to `use Alantiller\Auth;` and construct `new Auth(...)`. Regenerate the local autoloader with `composer dump-autoload`. The method signatures and result formats are unchanged. Exceptions remain under `Alantiller\Auth\Exceptions`, and internal helpers remain under `Alantiller\Auth\Internal`.
 
 Generate the encryption key **once**, keep it in your application's secret configuration, and reuse it across requests and servers:
 
@@ -82,10 +85,10 @@ For SQLite, enable foreign keys on each connection:
 $pdo = new PDO('sqlite:' . __DIR__ . '/app.sqlite');
 $pdo->exec('PRAGMA foreign_keys = ON');
 $pdo->exec('PRAGMA busy_timeout = 5000');
-$auth = new Client($pdo);
+$auth = new Auth($pdo);
 ```
 
-`Client` sets PDO's error mode to exceptions. Account changes and token validation manage their own transactions; use a connection with no active transaction. Do not wrap these calls in an outer transaction. InnoDB locks account rows during authentication and changes; concurrent SQLite writes may produce a database-busy exception. Handle transient database errors in your application's retry policy.
+`Auth` sets PDO's error mode to exceptions. Account changes and token validation manage their own transactions; use a connection with no active transaction. Do not wrap these calls in an outer transaction. InnoDB locks account rows during authentication and changes; concurrent SQLite writes may produce a database-busy exception. Handle transient database errors in your application's retry policy.
 
 ## Database schema
 
@@ -204,7 +207,7 @@ CREATE INDEX tokens_expiry_index ON tokens (expires_at);
 With custom table names, update your migration's table names, foreign-key reference, and index/constraint names accordingly:
 
 ```php
-$auth = new Client($pdo, [
+$auth = new Auth($pdo, [
     'users_table' => 'app_users',
     'tokens_table' => 'app_tokens',
 ]);
@@ -558,7 +561,7 @@ All options are optional. Unknown options and invalid values throw `InvalidArgum
 Example:
 
 ```php
-$auth = new Client($pdo, [
+$auth = new Auth($pdo, [
     'auth_token_ttl' => 3600,
     'magic_link_token_ttl' => 600,
     'issuer' => 'Example App',
@@ -568,7 +571,7 @@ $auth = new Client($pdo, [
 
 ## API reference
 
-All listed methods are on `Alantiller\Auth\Client`. Mutations and authentication operations return result arrays; explicit getter/maintenance exceptions are shown below. Parameter names are shown for clarity; examples use positional arguments.
+All listed methods are on `Alantiller\Auth`. Mutations and authentication operations return result arrays; explicit getter/maintenance exceptions are shown below. Parameter names are shown for clarity; examples use positional arguments.
 
 | Method | Return / behavior |
 | --- | --- |
@@ -716,3 +719,22 @@ PHPUnit uses `phpunit.xml.dist` and `pdo_sqlite`. Tests create a fresh in-memory
 To run account integration tests against MySQL, provide `AUTH_TEST_MYSQL_DSN`, `AUTH_TEST_MYSQL_USER`, and `AUTH_TEST_MYSQL_PASSWORD`. Use a **dedicated empty test database**: each test creates uniquely named test tables and drops those tables afterwards. Exception-isolation tests always use SQLite.
 
 The package declares the MIT license in `composer.json`.
+
+## Development notes
+
+### 2026-10-17: Shorter authentication entry point
+
+Renamed `Alantiller\Auth\Client` to `Alantiller\Auth` and moved its implementation from `src/Client.php` to `src/Auth.php`. Applications can import `Alantiller\Auth` and construct `new Auth($pdo, $config)`.
+
+This is an intentional breaking change to the entry class name. Existing applications must update their imports, type references and constructor calls. Public method signatures, authentication behavior, database schemas and result formats are preserved.
+
+Exceptions retain the `Alantiller\Auth\Exceptions` namespace, and internal helpers retain `Alantiller\Auth\Internal`. Their files remain in their existing directories. Composer explicitly classmaps `src/Auth.php` while preserving the existing PSR-4 mapping for the nested namespaces, so shortening the entry point does not move or rename the other classes.
+
+Updated the README, PHPDoc references and test imports to use the renamed entry point. The integration test class and deterministic clock helper are now named `AuthTest` and `TestAuth`.
+
+Verification:
+
+- Composer configuration validation and optimized autoload generation with strict PSR checks pass.
+- Composer autoload smoke checks instantiate `Alantiller\Auth` and load all three internal helpers and a validation exception in their existing namespaces.
+- PHPStan level 8 passes for source and tests, targeting PHP 8.1. The local run used `composer analyse -- --debug` to avoid sandbox restrictions on PHPStan's worker socket.
+- PHPUnit passes with 22 SQLite tests and 570 assertions. MySQL integration tests were not run locally.

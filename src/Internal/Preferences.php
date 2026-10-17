@@ -11,7 +11,7 @@ use Alantiller\Auth\Exceptions\ValidationException;
  * Preferences are stored as a JSON object and decoded into PHP arrays.
  * This helper does not access the database or retain user-specific state.
  *
- * @internal Applications should manage preferences through Client.
+ * @internal Applications should manage preferences through Auth.
  */
 final class Preferences
 {

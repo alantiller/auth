@@ -9,10 +9,10 @@ use Alantiller\Auth\Exceptions\ConfigurationException;
 /**
  * Handle authenticator-secret encryption and second-factor matching.
  *
- * The helper retains only encryption configuration. Client owns account locks
+ * The helper retains only encryption configuration. Auth owns account locks
  * and persists accepted code counters or consumed recovery codes atomically.
  *
- * @internal Applications should access two-factor operations through Client.
+ * @internal Applications should access two-factor operations through Auth.
  */
 final class TwoFactor
 {
@@ -106,7 +106,7 @@ final class TwoFactor
     /**
      * Validate a second factor and return the account changes that consume it.
      *
-     * No database write or login state is kept here. Client must save the changes
+     * No database write or login state is kept here. Auth must save the changes
      * under its account lock before committing successful authentication.
      *
      * @param array<string, mixed> $user The stored account row, including internal authentication fields.
@@ -148,7 +148,7 @@ final class TwoFactor
         $candidate = hash('sha256', $otp);
         foreach ($hashes as $index => $hash) {
             if (hash_equals($hash, $candidate)) {
-                // Return the remaining hashes; Client saves them in its transaction.
+                // Return the remaining hashes; Auth saves them in its transaction.
                 unset($hashes[$index]);
                 return ['two_factor_recovery_codes' => json_encode(array_values($hashes), JSON_THROW_ON_ERROR)];
             }

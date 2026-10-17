@@ -2,7 +2,7 @@
 
 namespace Alantiller\Auth\Tests;
 
-use Alantiller\Auth\Client;
+use Alantiller\Auth;
 use Alantiller\Auth\Exceptions\BaseException;
 use Alantiller\Auth\Exceptions\ConfigurationException;
 use Alantiller\Auth\Exceptions\DatabaseException;
@@ -26,8 +26,8 @@ final class ExceptionTest extends TestCase
     /** @var PDO The isolated in-memory test database. */
     private PDO $pdo;
 
-    /** @var TestClient A client with encryption configured and a fixed clock. */
-    private TestClient $auth;
+    /** @var TestAuth A client with encryption configured and a fixed clock. */
+    private TestAuth $auth;
 
     /** Create a database using the README's caller-managed SQLite schema. */
     protected function setUp(): void
@@ -39,7 +39,7 @@ final class ExceptionTest extends TestCase
         preg_match_all('/```sql\n(.*?)\n```/s', $readme, $matches);
         equal(2, count($matches[1]));
         $this->pdo->exec($matches[1][1]);
-        $this->auth = new TestClient($this->pdo, ['encryption_key' => base64_encode(random_bytes(32))]);
+        $this->auth = new TestAuth($this->pdo, ['encryption_key' => base64_encode(random_bytes(32))]);
     }
 
     /** Verify exception metadata and PHP's standard constructor compatibility. */
@@ -83,13 +83,13 @@ final class ExceptionTest extends TestCase
     /** Verify configuration errors remain catchable as InvalidArgumentException. */
     public function test_configuration_errors_have_option_metadata(): void
     {
-        $exception = throws(ConfigurationException::class, fn () => new Client($this->pdo, ['auth_token_ttl' => 0]));
+        $exception = throws(ConfigurationException::class, fn () => new Auth($this->pdo, ['auth_token_ttl' => 0]));
         self::assertInstanceOf(InvalidArgumentException::class, $exception);
         self::assertSame('configuration_error', $exception->errorCode);
         self::assertSame('auth_token_ttl', $exception->field);
-        $exception = throws(ConfigurationException::class, fn () => new Client($this->pdo, ['encryption_key' => 'bad-key']));
+        $exception = throws(ConfigurationException::class, fn () => new Auth($this->pdo, ['encryption_key' => 'bad-key']));
         self::assertSame('encryption_key', $exception->field);
-        $exception = throws(ConfigurationException::class, fn () => (new Client($this->pdo))->begin_two_factor_setup(1));
+        $exception = throws(ConfigurationException::class, fn () => (new Auth($this->pdo))->begin_two_factor_setup(1));
         self::assertSame('encryption_key', $exception->field);
     }
 

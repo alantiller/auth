@@ -2,7 +2,7 @@
 
 namespace Alantiller\Auth\Tests;
 
-use Alantiller\Auth\Client;
+use Alantiller\Auth;
 use Alantiller\Auth\Internal\Totp;
 use Alantiller\Auth\Exceptions\BaseException;
 use Alantiller\Auth\Exceptions\InvalidArgumentException;
@@ -13,13 +13,13 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/Support.php';
 
 /** Integration tests using the exact application migration schema in README.md. */
-final class ClientTest extends TestCase
+final class AuthTest extends TestCase
 {
     /** @var PDO The isolated test database connection. */
     private PDO $pdo;
 
-    /** @var TestClient The client with a deterministic test clock. */
-    private TestClient $auth;
+    /** @var TestAuth The client with a deterministic test clock. */
+    private TestAuth $auth;
 
     /** @var array<string, mixed> The configuration shared by fresh client instances. */
     private array $config;
@@ -73,7 +73,7 @@ final class ClientTest extends TestCase
             'encryption_key' => base64_encode(random_bytes(32)),
             'issuer' => 'Test App',
         ];
-        $this->auth = new TestClient($this->pdo, $this->config);
+        $this->auth = new TestAuth($this->pdo, $this->config);
     }
 
     /** Remove only the uniquely named MySQL tables created by this test. */
@@ -88,10 +88,10 @@ final class ClientTest extends TestCase
     /**
      * Create a verified account for one integration scenario.
      *
-     * @param TestClient $auth The deterministic authentication client.
+     * @param TestAuth $auth The deterministic authentication client.
      * @return array{0: int, 1: string} The user identifier and unique email address.
      */
-    private function fixture(TestClient $auth): array
+    private function fixture(TestAuth $auth): array
     {
         $email = 'fixture' . ++$this->fixtureNumber . '@example.com';
         $registration = ok($auth->register_user('Jane', 'Doe', $email, $this->password));
@@ -102,11 +102,11 @@ final class ClientTest extends TestCase
     /**
      * Read a user expected to exist and assert the nullable getter result.
      *
-     * @param Client $auth The client to read from.
+     * @param Auth $auth The client to read from.
      * @param int $id The existing user identifier.
      * @return array<string, mixed> The public account fields.
      */
-    private function user(Client $auth, int $id): array
+    private function user(Auth $auth, int $id): array
     {
         $user = $auth->get_user($id);
         check($user !== null, 'Expected account to exist.');
@@ -136,14 +136,14 @@ final class ClientTest extends TestCase
         $matches = [1 => $this->schemas];
         $password = $this->password;
         $empty = new PDO('sqlite::memory:');
-        new Client($empty);
+        new Auth($empty);
         equal(0, (int) column($empty, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'"));
-        throws(InvalidArgumentException::class, fn () => new Client($pdo, $config + ['typo' => true]));
+        throws(InvalidArgumentException::class, fn () => new Auth($pdo, $config + ['typo' => true]));
         foreach ([['auth_token_ttl' => 0], ['auth_token_ttl' => '300'], ['users_table' => 'users; DROP TABLE users'], ['tokens_table' => $config['users_table']], ['tokens_table' => strtoupper($config['users_table'])], ['require_verified_email' => 1], ['encryption_key' => 'bad'], ['issuer' => 'bad:issuer']] as $bad) {
-            throws(InvalidArgumentException::class, fn () => new Client($pdo, array_replace($config, $bad)));
+            throws(InvalidArgumentException::class, fn () => new Auth($pdo, array_replace($config, $bad)));
         }
         $empty->exec(str_replace(['users', 'tokens'], ['app_users', 'app_tokens'], $matches[1][1]));
-        $custom = new Client($empty, ['users_table' => 'app_users', 'tokens_table' => 'app_tokens']);
+        $custom = new Auth($empty, ['users_table' => 'app_users', 'tokens_table' => 'app_tokens']);
         $registered = ok($custom->register_user('Custom', 'Tables', 'custom@example.com', $password));
         ok($custom->verify_email($registered['token']));
         ok($custom->authenticate('custom@example.com', $password));
@@ -367,7 +367,7 @@ final class ClientTest extends TestCase
         $code = Totp::code($setup['secret'], intdiv($auth->clock, 30));
         error('invalid_credentials', $auth->authenticate($email, 'wrong-long-password', $code));
         // A fresh instance can authenticate directly, without any earlier login request.
-        $fresh = new TestClient($pdo, $config);
+        $fresh = new TestAuth($pdo, $config);
         $fresh->clock = $auth->clock;
         $login = ok($fresh->authenticate($email, $password, $code));
         ok($auth->authenticate_token($login['token']));
@@ -394,7 +394,7 @@ final class ClientTest extends TestCase
         equal(['success' => false, 'user' => [], 'error' => 'two_factor_required'], $missingCode);
         error('two_factor_required', $auth->authenticate_magic_link($magic['token']));
         equal(1, (int) column($pdo, "SELECT COUNT(*) FROM $tokensTable WHERE user_id = $id"));
-        $fresh = new TestClient($pdo, $config);
+        $fresh = new TestAuth($pdo, $config);
         ok($fresh->authenticate_magic_link($magic['token'], $confirmed['recovery_codes'][0]));
         error('invalid_token', $auth->authenticate_magic_link($magic['token'], $confirmed['recovery_codes'][1]));
         $magic = ok($auth->request_magic_link($email));
@@ -486,9 +486,9 @@ final class ClientTest extends TestCase
         throws(InvalidArgumentException::class, fn () => $auth->update_user($id, ['email_verified_at' => 1]));
         throws(InvalidArgumentException::class, fn () => $auth->update_user($id, []));
         $unverified = ok($auth->create_user('No', 'Verification', 'no-verification@example.com', $password));
-        $optional = new TestClient($pdo, array_replace($config, ['require_verified_email' => false]));
+        $optional = new TestAuth($pdo, array_replace($config, ['require_verified_email' => false]));
         ok($optional->authenticate('no-verification@example.com', $password));
-        $noKey = new Client($pdo, array_replace($config, ['encryption_key' => null]));
+        $noKey = new Auth($pdo, array_replace($config, ['encryption_key' => null]));
         throws(InvalidArgumentException::class, fn () => $noKey->begin_two_factor_setup($id));
         $pdo->beginTransaction();
         try {

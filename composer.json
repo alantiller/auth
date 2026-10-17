@@ -6,7 +6,10 @@
     "autoload": {
         "psr-4": {
             "Alantiller\\Auth\\": "src/"
-        }
+        },
+        "classmap": [
+            "src/Auth.php"
+        ]
     },
     "authors": [
         {
